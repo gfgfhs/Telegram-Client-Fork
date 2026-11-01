@@ -1,5 +1,3 @@
-import os
-import asyncio
 from pathlib import Path
 from telethon import TelegramClient
 from telethon.errors import (
@@ -7,11 +5,11 @@ from telethon.errors import (
     PhoneCodeInvalidError,
     PhoneNumberInvalidError,
     PhoneNumberOccupiedError,
+    PhoneNumberUnoccupiedError,
     FloodWaitError,
     PhoneCodeExpiredError,
 )
 from telethon.tl.functions.auth import SignUpRequest
-from telethon.tl.types import User
 
 from config import API_ID, API_HASH, SESSIONS_DIR
 
@@ -44,20 +42,20 @@ class AccountManager:
         session_name: str | None = None,
     ) -> dict:
         """
-        Регистрация нового аккаунта.
+        Регистрация нового аккаунта или вход в существующий.
 
         Процесс:
         1. Отправляет код на номер
         2. Ждёт ввода кода от пользователя
-        3. Если аккаунт новый — регистрирует его
-        4. Сохраняет сессию
+        3. Если аккаунт новый — регистрирует его (SignUp)
+        4. Если аккаунт уже есть — входит
+        5. Сохраняет сессию
         """
         phone = phone.strip().replace(" ", "").replace("-", "")
         if not phone.startswith("+"):
             phone = "+" + phone
 
         if session_name is None:
-            # Имя сессии = номер без +
             session_name = phone.lstrip("+")
 
         client = self.get_client(session_name)
@@ -73,16 +71,14 @@ class AccountManager:
                     "session": session_name,
                 }
 
-            # Отправляем код
             print(f"\n[+] Отправляю код на {phone}...")
             sent = await client.send_code_request(phone)
             phone_code_hash = sent.phone_code_hash
 
-            # Ждём код от пользователя
             code = input("[?] Введи код из Telegram/SMS: ").strip()
 
             try:
-                # Пытаемся войти (если номер уже зарегистрирован)
+                # Пытаемся войти (номер уже зарегистрирован)
                 await client.sign_in(phone, code, phone_code_hash=phone_code_hash)
                 me = await client.get_me()
                 return {
@@ -99,7 +95,6 @@ class AccountManager:
                 }
 
             except SessionPasswordNeededError:
-                # 2FA
                 password = input("[?] Введи пароль 2FA: ").strip()
                 await client.sign_in(password=password)
                 me = await client.get_me()
@@ -116,13 +111,43 @@ class AccountManager:
                     "session": session_name,
                 }
 
+            except PhoneNumberUnoccupiedError:
+                # Номер свободен — регистрируем новый аккаунт
+                print("[+] Номер свободен. Регистрирую новый аккаунт...")
+                try:
+                    await client(SignUpRequest(
+                        phone_number=phone,
+                        phone_code_hash=phone_code_hash,
+                        first_name=first_name,
+                        last_name=last_name or "",
+                    ))
+                    me = await client.get_me()
+                    return {
+                        "success": True,
+                        "action": "register",
+                        "user": {
+                            "id": me.id,
+                            "first_name": me.first_name,
+                            "last_name": me.last_name,
+                            "phone": me.phone,
+                            "username": me.username,
+                        },
+                        "session": session_name,
+                    }
+                except Exception as reg_err:
+                    return {
+                        "success": False,
+                        "error": f"Ошибка регистрации: {reg_err}",
+                        "session": session_name,
+                    }
+
             except Exception as e:
-                # Номер не зарегистрирован — делаем SignUp
+                # На всякий случай пробуем SignUp, если ошибка похожа на "нужна регистрация"
                 error_str = str(e).lower()
-                if "phone number unoccupied" in error_str or "sign up" in error_str or isinstance(e, PhoneNumberOccupiedError) is False:
-                    print("[+] Номер свободен. Регистрирую новый аккаунт...")
+                if "unoccupied" in error_str or "sign up" in error_str or "signup" in error_str:
+                    print("[+] Пробую зарегистрировать новый аккаунт...")
                     try:
-                        result = await client(SignUpRequest(
+                        await client(SignUpRequest(
                             phone_number=phone,
                             phone_code_hash=phone_code_hash,
                             first_name=first_name,
@@ -147,12 +172,11 @@ class AccountManager:
                             "error": f"Ошибка регистрации: {reg_err}",
                             "session": session_name,
                         }
-                else:
-                    return {
-                        "success": False,
-                        "error": str(e),
-                        "session": session_name,
-                    }
+                return {
+                    "success": False,
+                    "error": str(e),
+                    "session": session_name,
+                }
 
         except FloodWaitError as e:
             return {
