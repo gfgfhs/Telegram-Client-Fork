@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
 """
 Telegram Multi-Account Client
-Поддержка регистрации и управления большим количеством аккаунтов.
+Поддержка регистрации, multi-account и бесплатных прокси.
 """
 
 import asyncio
 import sys
 from pathlib import Path
 
-from config import API_ID, API_HASH, SESSIONS_DIR
+from config import API_ID, API_HASH, SESSIONS_DIR, USE_FREE_PROXY
 from account_manager import AccountManager
+from proxy_manager import find_working_proxy, proxy_to_telethon
 
 
 def check_config():
@@ -21,10 +22,10 @@ def check_config():
 
 
 def print_header():
-    print("\n" + "=" * 50)
+    print("\n" + "=" * 55)
     print("  Telegram Multi-Account Client")
-    print("  Регистрация + управление 100+ аккаунтами")
-    print("=" * 50)
+    print("  Регистрация + 100+ аккаунтов + бесплатные прокси")
+    print("=" * 55)
 
 
 def print_menu():
@@ -33,8 +34,26 @@ def print_menu():
     print("2. Войти в существующую сессию")
     print("3. Список всех аккаунтов")
     print("4. Проверить аккаунт")
-    print("5. Выход")
+    print("5. Найти бесплатный прокси заново")
+    print("6. Выход")
     print()
+
+
+async def setup_proxy() -> tuple | None:
+    """Ищет бесплатный прокси, если включено в config."""
+    if not USE_FREE_PROXY:
+        print("[*] Прокси отключены (USE_FREE_PROXY = False)")
+        return None
+
+    print("[*] Ищу бесплатный SOCKS5 прокси...")
+    proxy_str = await find_working_proxy(max_try=30)
+    if proxy_str:
+        print(f"[✓] Использую прокси: {proxy_str}")
+        return proxy_to_telethon(proxy_str)
+    else:
+        print("[!] Бесплатный прокси не найден. Продолжаю без прокси.")
+        print("    (Часто бесплатные прокси мертвы — это нормально)")
+        return None
 
 
 async def register_flow(manager: AccountManager):
@@ -106,7 +125,6 @@ async def list_accounts(manager: AccountManager):
     if not sessions:
         print("Нет сохранённых сессий.")
         return
-
     print(f"Найдено сессий: {len(sessions)}\n")
     for i, name in enumerate(sessions, 1):
         print(f"  {i:3}. {name}")
@@ -151,8 +169,10 @@ async def main():
     check_config()
     Path(SESSIONS_DIR).mkdir(exist_ok=True)
 
-    manager = AccountManager()
     print_header()
+
+    proxy = await setup_proxy()
+    manager = AccountManager(proxy=proxy)
 
     while True:
         print_menu()
@@ -167,6 +187,9 @@ async def main():
         elif choice == "4":
             await check_flow(manager)
         elif choice == "5":
+            proxy = await setup_proxy()
+            manager = AccountManager(proxy=proxy)
+        elif choice == "6":
             print("\nВыход.")
             break
         else:

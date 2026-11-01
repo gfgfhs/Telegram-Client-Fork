@@ -6,3 +6,6 @@ API_HASH = ""       # <-- замени на свой api_hash (строка)
 
 # Папка для хранения сессий
 SESSIONS_DIR = "sessions"
+
+# Использовать бесплатные прокси автоматически (True/False)
+USE_FREE_PROXY = True
