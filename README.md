@@ -1,2 +1,76 @@
-# Telegram-Client-Fork
-Custom Telegram client fork based on Telegram-FOSS with additional features
+# Telegram Multi-Account Client
+
+Клиент для работы с большим количеством Telegram-аккаунтов (100+) на ПК.
+
+## Возможности
+
+- Управление сотнями аккаунтов через `.session` файлы
+- **Регистрация новых аккаунтов** (ввод номера → получение кода → создание аккаунта)
+- Вход в существующие аккаунты
+- Поддержка 2FA
+- Хранение аккаунтов в папке `sessions/`
+- Простой CLI-интерфейс
+
+## Требования
+
+- Python 3.9+
+- API_ID и API_HASH (получить на https://my.telegram.org)
+
+## Установка
+
+```bash
+git clone https://github.com/gfgfhs/Telegram-Client-Fork.git
+cd Telegram-Client-Fork
+pip install -r requirements.txt
+```
+
+## Настройка
+
+1. Открой `config.py`
+2. Вставь свой `API_ID` и `API_HASH`
+
+```python
+API_ID = 12345678
+API_HASH = "your_api_hash_here"
+```
+
+## Использование
+
+```bash
+python main.py
+```
+
+### Меню
+
+1. **Зарегистрировать новый аккаунт** — вводишь номер, ждёшь код, вводишь код и имя
+2. **Войти в существующий аккаунт** — если сессия уже есть
+3. **Список аккаунтов** — показывает все сохранённые сессии
+4. **Проверить аккаунт** — подключается и показывает информацию
+5. **Выход**
+
+## Структура
+
+```
+Telegram-Client-Fork/
+├── main.py              # Главный файл
+├── config.py            # Настройки API
+├── account_manager.py   # Логика работы с аккаунтами
+├── requirements.txt
+├── sessions/            # Здесь хранятся .session файлы
+└── README.md
+```
+
+## Важно
+
+- Массовая регистрация аккаунтов может нарушать правила Telegram.
+- Используй на свой страх и риск.
+- Рекомендуется использовать прокси при большом количестве аккаунтов.
+- Один API_ID/API_HASH можно использовать для многих аккаунтов.
+
+## Получение API_ID и API_HASH
+
+1. Зайди на https://my.telegram.org
+2. Войди по номеру телефона
+3. Перейди в **API development tools**
+4. Создай приложение
+5. Скопируй `api_id` и `api_hash`
